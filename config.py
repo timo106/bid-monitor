@@ -37,12 +37,17 @@ SOURCES = {
     "kunming_ggzy": {
         "name": "昆明市公共资源交易网",
         "url": "http://ggzy.km.gov.cn",
+        "enabled": False,  # DNS解析失败，暂时禁用
+    },
+    "kunming_tzb": {
+        "name": "昆明市公共资源交易中心",
+        "url": "http://kmszbzx.gdtzb.com/v1/",
         "enabled": True,
     },
     "cebpub": {
         "name": "中国招标投标公共服务平台",
         "url": "http://www.cebpubservice.com/",
-        "enabled": True,
+        "enabled": False,  # 405错误，暂时禁用
     },
 }
 

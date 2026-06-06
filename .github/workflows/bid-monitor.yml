@@ -22,7 +22,10 @@ jobs:
           cache: 'pip'
 
       - name: 安装依赖
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium
+          playwright install-deps chromium
 
       - name: 运行招标监控
         env:

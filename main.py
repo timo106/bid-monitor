@@ -13,6 +13,7 @@ from scrapers import (
     CCGPScraper,
     YunnanGGZYScraper,
     KunmingGGZYScraper,
+    KunmingTZBScraper,
     CEBPubScraper,
 )
 from scrapers.base import BidItem
@@ -35,6 +36,7 @@ def run_scrapers() -> list[BidItem]:
         "ccgp": CCGPScraper,
         "yunnan_ggzy": YunnanGGZYScraper,
         "kunming_ggzy": KunmingGGZYScraper,
+        "kunming_tzb": KunmingTZBScraper,
         "cebpub": CEBPubScraper,
     }
 
