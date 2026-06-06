@@ -44,6 +44,7 @@ class KunmingTZBScraper(BaseScraper):
     def _scrape_with_playwright(self, keywords: list[str], region_keywords: list[str]) -> list[BidItem]:
         """使用 Playwright 浏览器抓取"""
         from playwright.sync_api import sync_playwright
+        from urllib.parse import quote
 
         items = []
 
@@ -54,35 +55,22 @@ class KunmingTZBScraper(BaseScraper):
             )
             page = context.new_page()
 
-            # 访问首页，等待WAF验证通过
-            logger.info("[昆明市公共资源交易中心] 正在访问首页...")
-            page.goto(self.base_url, wait_until="networkidle", timeout=30000)
-            page.wait_for_timeout(3000)  # 等待JS执行
+            # 使用搜索功能搜索每个关键词，筛选云南地区(area_id=25)
+            for keyword in keywords:
+                logger.info(f"[昆明市公共资源交易中心] 搜索关键词: {keyword}")
+                # areaid=25 是云南，type=10 是工程招标
+                search_url = f"http://www.gdtzb.com/zb/search.php?kw={quote(keyword)}&areaid=25&type=10"
 
-            # 尝试找到招标信息列表页面
-            # 工程招标类型的URL可能是 /v1/project 或类似路径
-            urls_to_try = [
-                "http://kmszbzx.gdtzb.com/v1/project",
-                "http://kmszbzx.gdtzb.com/v1/list",
-                "http://kmszbzx.gdtzb.com/v1/bid",
-            ]
-
-            for url in urls_to_try:
                 try:
-                    logger.info(f"[昆明市公共资源交易中心] 尝试访问: {url}")
-                    page.goto(url, wait_until="networkidle", timeout=15000)
+                    page.goto(search_url, wait_until="networkidle", timeout=30000)
                     page.wait_for_timeout(2000)
 
-                    # 检查页面内容
-                    content = page.content()
-                    if "招标" in content or "公告" in content:
-                        logger.info(f"[昆明市公共资源交易中心] 找到列表页面: {url}")
-                        items = self._parse_page_content(page, keywords, region_keywords)
-                        if items:
-                            break
+                    # 解析搜索结果
+                    keyword_items = self._parse_search_results(page, keyword, region_keywords)
+                    items.extend(keyword_items)
+                    logger.info(f"[昆明市公共资源交易中心] 关键词 '{keyword}' 找到 {len(keyword_items)} 条结果")
                 except Exception as e:
-                    logger.debug(f"[昆明市公共资源交易中心] 访问失败: {url} - {e}")
-                    continue
+                    logger.warning(f"[昆明市公共资源交易中心] 搜索 '{keyword}' 失败: {e}")
 
             browser.close()
 
@@ -94,57 +82,93 @@ class KunmingTZBScraper(BaseScraper):
 
         try:
             # 等待列表加载
-            page.wait_for_selector("table, .list, .items, ul", timeout=10000)
+            page.wait_for_selector("div.pdbox ul li", timeout=10000)
 
-            # 尝试多种选择器
-            selectors = [
-                "table tbody tr",
-                ".list-item",
-                ".item",
-                "ul li a",
-                ".news-list li",
-                ".bid-list li",
-            ]
+            # 获取所有列表项
+            list_items = page.query_selector_all("div.pdbox ul li")
+            logger.info(f"[昆明市公共资源交易中心] 找到 {len(list_items)} 个列表项")
 
-            for selector in selectors:
-                elements = page.query_selector_all(selector)
-                if elements:
-                    logger.info(f"[昆明市公共资源交易中心] 找到 {len(elements)} 个元素 ({selector})")
-                    for el in elements:
-                        try:
-                            # 提取标题和链接
-                            link = el.query_selector("a")
-                            if not link:
-                                continue
+            for li in list_items:
+                try:
+                    # 提取链接和标题
+                    link = li.query_selector("a")
+                    if not link:
+                        continue
 
-                            title = link.inner_text().strip()
-                            url = link.get_attribute("href") or ""
+                    title = link.inner_text().strip()
+                    url = link.get_attribute("href") or ""
 
-                            if url and not url.startswith("http"):
-                                url = f"http://kmszbzx.gdtzb.com{url}"
+                    if url and not url.startswith("http"):
+                        url = f"http://kmszbzx.gdtzb.com{url}"
 
-                            # 提取日期
-                            date_el = el.query_selector("span.date, .time, td:last-child")
-                            pub_date = date_el.inner_text().strip() if date_el else ""
+                    # 提取日期
+                    date_span = li.query_selector("span.fr")
+                    pub_date = date_span.inner_text().strip() if date_span else ""
 
-                            # 检查是否包含关键词
-                            title_lower = title.lower()
-                            keyword_match = any(kw in title for kw in keywords)
+                    # 检查是否包含关键词
+                    keyword_match = any(kw in title for kw in keywords)
 
-                            if keyword_match:
-                                item = BidItem(
-                                    title=title,
-                                    url=url,
-                                    source=self.source_name,
-                                    publish_date=pub_date,
-                                    region="昆明",
-                                )
-                                items.append(item)
-                        except Exception as e:
-                            logger.warning(f"[昆明市公共资源交易中心] 解析元素失败: {e}")
-                    break
+                    if keyword_match:
+                        item = BidItem(
+                            title=title,
+                            url=url,
+                            source=self.source_name,
+                            publish_date=pub_date,
+                            region="昆明",
+                        )
+                        items.append(item)
+                        logger.info(f"[昆明市公共资源交易中心] 找到匹配: {title[:50]}...")
+                except Exception as e:
+                    logger.warning(f"[昆明市公共资源交易中心] 解析元素失败: {e}")
 
         except Exception as e:
             logger.warning(f"[昆明市公共资源交易中心] 页面解析失败: {e}")
+
+        return items
+
+    def _parse_search_results(self, page, keyword: str, region_keywords: list[str]) -> list[BidItem]:
+        """解析搜索结果"""
+        items = []
+
+        try:
+            # 等待搜索结果加载
+            page.wait_for_selector("li.tender-list", timeout=10000)
+
+            # 获取所有搜索结果
+            result_elements = page.query_selector_all("li.tender-list")
+            logger.info(f"[昆明市公共资源交易中心] 找到 {len(result_elements)} 个搜索结果")
+
+            for el in result_elements:
+                try:
+                    # 提取标题和链接
+                    title_link = el.query_selector("div.tender-title a")
+                    if not title_link:
+                        continue
+
+                    title = title_link.inner_text().strip()
+                    url = title_link.get_attribute("href") or ""
+
+                    # 只处理招标公告链接
+                    if not url or "g-zb-" not in url:
+                        continue
+
+                    # 提取日期
+                    date_el = el.query_selector("div.tender-other p.date")
+                    pub_date = date_el.inner_text().strip() if date_el else ""
+
+                    item = BidItem(
+                        title=title,
+                        url=url,
+                        source=self.source_name,
+                        publish_date=pub_date,
+                        region="云南",
+                    )
+                    items.append(item)
+                    logger.info(f"[昆明市公共资源交易中心] 找到: {title[:50]}...")
+                except Exception as e:
+                    logger.warning(f"[昆明市公共资源交易中心] 解析搜索结果失败: {e}")
+
+        except Exception as e:
+            logger.warning(f"[昆明市公共资源交易中心] 搜索结果解析失败: {e}")
 
         return items
