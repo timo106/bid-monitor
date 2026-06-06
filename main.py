@@ -73,20 +73,26 @@ def deduplicate_items(items: list[BidItem]) -> list[BidItem]:
 
 
 def filter_by_region(items: list[BidItem], region_keywords: list[str]) -> list[BidItem]:
-    """按地区筛选（如果爬虫未筛选，这里兜底）"""
-    filtered = []
+    """按地区筛选，但保留所有结果，优先显示目标地区"""
     for item in items:
-        # 如果已经有地区标记，直接保留
-        if item.region:
-            filtered.append(item)
-            continue
-        # 否则检查标题中是否包含地区关键词
+        # 检查标题或已有地区标记中是否包含目标地区关键词
         for rk in region_keywords:
-            if rk in item.title:
+            if rk in item.title or rk in item.region:
                 item.region = rk
-                filtered.append(item)
                 break
-    return filtered
+    # 不再过滤，返回所有结果
+    return items
+
+
+def sort_by_region(items: list[BidItem], region_keywords: list[str]) -> list[BidItem]:
+    """按地区排序，目标地区的排在前面"""
+    def sort_key(item):
+        # 如果是目标地区，排在前面（返回0），否则排在后面（返回1）
+        for rk in region_keywords:
+            if rk in item.region:
+                return 0
+        return 1
+    return sorted(items, key=sort_key)
 
 
 def main():
@@ -105,13 +111,16 @@ def main():
     unique_items = deduplicate_items(all_items)
     logger.info(f"去重后剩余 {len(unique_items)} 条")
 
-    # 3. 地区筛选（兜底）
-    filtered_items = filter_by_region(unique_items, REGION_KEYWORDS)
-    logger.info(f"地区筛选后剩余 {len(filtered_items)} 条")
+    # 3. 地区标记（不过滤，只标记）
+    marked_items = filter_by_region(unique_items, REGION_KEYWORDS)
 
-    # 4. 发送邮件
-    if filtered_items:
-        success = send_email(filtered_items)
+    # 4. 按地区排序（目标地区优先）
+    sorted_items = sort_by_region(marked_items, REGION_KEYWORDS)
+    logger.info(f"最终返回 {len(sorted_items)} 条结果")
+
+    # 5. 发送邮件
+    if sorted_items:
+        success = send_email(sorted_items)
         if success:
             logger.info("✅ 任务完成，邮件已发送")
         else:
