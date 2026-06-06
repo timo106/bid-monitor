@@ -140,21 +140,27 @@ def build_email_content(items: list[BidItem], date_str: str) -> str:
     <table>
         <thead>
             <tr>
-                <th style="width: 50%;">标题</th>
-                <th style="width: 15%;">发布日期</th>
-                <th style="width: 15%;">地区</th>
-                <th style="width: 20%;">链接</th>
+                <th style="width: 35%;">标题</th>
+                <th style="width: 10%;">地区</th>
+                <th style="width: 12%;">投标保证金</th>
+                <th style="width: 15%;">投标截止时间</th>
+                <th style="width: 10%;">发布日期</th>
+                <th style="width: 18%;">链接</th>
             </tr>
         </thead>
         <tbody>
 """
             for item in source_items:
                 region_html = f'<span class="region-tag">{item.region}</span>' if item.region else "-"
+                bond_html = f'<span style="color: #e74c3c; font-weight: bold;">{item.bid_bond}</span>' if item.bid_bond else "-"
+                end_time_html = f'<span style="color: #e67e22; font-weight: bold;">{item.bid_end_time}</span>' if item.bid_end_time else "-"
                 html += f"""
             <tr>
                 <td><a href="{item.url}" target="_blank">{item.title}</a></td>
-                <td>{item.publish_date or "-"}</td>
                 <td>{region_html}</td>
+                <td>{bond_html}</td>
+                <td>{end_time_html}</td>
+                <td>{item.publish_date or "-"}</td>
                 <td><a href="{item.url}" target="_blank">查看详情 →</a></td>
             </tr>
 """
@@ -211,8 +217,11 @@ def send_email(items: list[BidItem]) -> bool:
     text_content += f"共找到 {len(items)} 条招标信息\n\n"
     for item in items:
         text_content += f"[{item.source}] {item.title}\n"
-        text_content += f"  链接: {item.url}\n"
-        text_content += f"  日期: {item.publish_date}\n\n"
+        text_content += f"  地区: {item.region or '-'}\n"
+        text_content += f"  投标保证金: {item.bid_bond or '-'}\n"
+        text_content += f"  投标截止时间: {item.bid_end_time or '-'}\n"
+        text_content += f"  发布日期: {item.publish_date}\n"
+        text_content += f"  链接: {item.url}\n\n"
     msg.attach(MIMEText(text_content, "plain", "utf-8"))
 
     # 发送邮件

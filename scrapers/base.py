@@ -24,8 +24,12 @@ class BidItem:
     source: str                         # 来源网站
     publish_date: str = ""              # 发布日期
     region: str = ""                    # 地区
-    amount: str = ""                    # 金额
+    amount: str = ""                    # 项目金额
     category: str = ""                  # 类型（招标公告/中标公告等）
+    bid_bond: str = ""                  # 投标保证金
+    bid_start_time: str = ""            # 投标开始时间
+    bid_end_time: str = ""              # 投标截止时间
+    contact: str = ""                   # 联系方式
 
     @property
     def unique_key(self) -> str:
@@ -63,6 +67,119 @@ class BaseScraper(ABC):
     def _sleep(self):
         """请求间隔"""
         time.sleep(REQUEST_DELAY)
+
+    def fetch_detail(self, item: BidItem) -> BidItem:
+        """
+        获取详情页信息（投标保证金、时间等）
+        子类可以重写此方法以适配不同网站
+
+        Args:
+            item: 基本信息的 BidItem
+
+        Returns:
+            补充了详细信息的 BidItem
+        """
+        if not item.url:
+            return item
+
+        try:
+            resp = self._request(item.url)
+            if not resp:
+                return item
+
+            html = resp.text
+            item = self._parse_detail(html, item)
+        except Exception as e:
+            logger.warning(f"[{self.source_name}] 获取详情失败: {e}")
+
+        return item
+
+    def _parse_detail(self, html: str, item: BidItem) -> BidItem:
+        """
+        解析详情页，提取投标保证金、时间等信息
+        子类应该重写此方法以适配不同网站结构
+
+        Args:
+            html: 详情页 HTML
+            item: BidItem 对象
+
+        Returns:
+            补充了详细信息的 BidItem
+        """
+        from bs4 import BeautifulSoup
+        import re
+
+        soup = BeautifulSoup(html, "lxml")
+        text = soup.get_text()
+
+        # 提取投标保证金
+        bond_patterns = [
+            r"投标保证金[：:]\s*([^\n]+)",
+            r"保证金[：:]\s*([^\n]+)",
+            r"担保金额[：:]\s*([^\n]+)",
+        ]
+        for pattern in bond_patterns:
+            match = re.search(pattern, text)
+            if match:
+                item.bid_bond = match.group(1).strip()[:100]
+                break
+
+        # 提取投标时间
+        time_patterns = [
+            r"投标截止时间[：:]\s*([^\n]+)",
+            r"截止时间[：:]\s*([^\n]+)",
+            r"报名截止[：:]\s*([^\n]+)",
+        ]
+        for pattern in time_patterns:
+            match = re.search(pattern, text)
+            if match:
+                item.bid_end_time = match.group(1).strip()[:100]
+                break
+
+        start_patterns = [
+            r"投标开始时间[：:]\s*([^\n]+)",
+            r"开标时间[：:]\s*([^\n]+)",
+            r"开启时间[：:]\s*([^\n]+)",
+        ]
+        for pattern in start_patterns:
+            match = re.search(pattern, text)
+            if match:
+                item.bid_start_time = match.group(1).strip()[:100]
+                break
+
+        # 提取联系方式
+        contact_patterns = [
+            r"联系人[：:]\s*([^\n]+)",
+            r"联系方式[：:]\s*([^\n]+)",
+            r"联系电话[：:]\s*([^\n]+)",
+        ]
+        for pattern in contact_patterns:
+            match = re.search(pattern, text)
+            if match:
+                item.contact = match.group(1).strip()[:100]
+                break
+
+        return item
+
+    def enrich_items(self, items: list[BidItem], max_detail: int = 10) -> list[BidItem]:
+        """
+        批量获取详情信息
+
+        Args:
+            items: BidItem 列表
+            max_detail: 最多获取详情的条数（避免请求过多）
+
+        Returns:
+            补充了详细信息的 BidItem 列表
+        """
+        enriched = []
+        for i, item in enumerate(items):
+            if i < max_detail:
+                logger.info(f"[{self.source_name}] 获取详情 ({i+1}/{min(len(items), max_detail)}): {item.title[:30]}...")
+                item = self.fetch_detail(item)
+                self._sleep()
+            enriched.append(item)
+        return enriched
 
     @abstractmethod
     def scrape(self, keywords: list[str], region_keywords: list[str]) -> list[BidItem]:

@@ -39,8 +39,11 @@ class KunmingGGZYScraper(BaseScraper):
                 seen.add(item.unique_key)
                 unique_results.append(item)
 
+        # 获取详情信息
+        unique_results = self.enrich_items(unique_results[:MAX_RESULTS_PER_SOURCE], max_detail=5)
+
         logger.info(f"[{self.source_name}] 共获取 {len(unique_results)} 条结果")
-        return unique_results[:MAX_RESULTS_PER_SOURCE]
+        return unique_results
 
     def _search_keyword(self, keyword: str, region_keywords: list[str]) -> list[BidItem]:
         """按关键词搜索"""
