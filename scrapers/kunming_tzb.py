@@ -63,7 +63,7 @@ class KunmingTZBScraper(BaseScraper):
 
                 try:
                     page.goto(search_url, wait_until="networkidle", timeout=30000)
-                    page.wait_for_timeout(2000)
+                    page.wait_for_timeout(5000)  # 增加等待时间，让验证码自动通过
 
                     # 解析搜索结果
                     keyword_items = self._parse_search_results(page, keyword, region_keywords)
@@ -131,8 +131,8 @@ class KunmingTZBScraper(BaseScraper):
         items = []
 
         try:
-            # 等待搜索结果加载
-            page.wait_for_selector("li.tender-list", timeout=10000)
+            # 等待搜索结果加载，增加超时时间
+            page.wait_for_selector("li.tender-list", timeout=30000)
 
             # 获取所有搜索结果
             result_elements = page.query_selector_all("li.tender-list")
@@ -169,6 +169,31 @@ class KunmingTZBScraper(BaseScraper):
                     logger.warning(f"[昆明市公共资源交易中心] 解析搜索结果失败: {e}")
 
         except Exception as e:
-            logger.warning(f"[昆明市公共资源交易中心] 搜索结果解析失败: {e}")
+            # 如果超时，尝试直接解析页面内容
+            logger.warning(f"[昆明市公共资源交易中心] 搜索结果解析失败，尝试直接解析页面: {e}")
+            try:
+                # 获取页面HTML内容
+                html = page.content()
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(html, 'lxml')
+
+                # 查找所有招标链接
+                for a in soup.find_all('a', href=True):
+                    href = a.get('href', '')
+                    title = a.get_text(strip=True)
+
+                    if 'g-zb-' in href and title and len(title) > 10:
+                        # 检查是否包含关键词
+                        if any(kw in title for kw in ['电力', '电网', '供电', '变电站', '输变电']):
+                            item = BidItem(
+                                title=title,
+                                url=href,
+                                source=self.source_name,
+                                region="云南",
+                            )
+                            items.append(item)
+                            logger.info(f"[昆明市公共资源交易中心] 找到(备用): {title[:50]}...")
+            except Exception as e2:
+                logger.warning(f"[昆明市公共资源交易中心] 备用解析也失败: {e2}")
 
         return items
