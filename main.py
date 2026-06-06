@@ -75,15 +75,16 @@ def deduplicate_items(items: list[BidItem]) -> list[BidItem]:
 
 
 def filter_by_region(items: list[BidItem], region_keywords: list[str]) -> list[BidItem]:
-    """按地区筛选，但保留所有结果，优先显示目标地区"""
+    """按地区筛选，只保留目标地区的招标信息"""
+    filtered = []
     for item in items:
         # 检查标题或已有地区标记中是否包含目标地区关键词
         for rk in region_keywords:
             if rk in item.title or rk in item.region:
                 item.region = rk
+                filtered.append(item)
                 break
-    # 不再过滤，返回所有结果
-    return items
+    return filtered
 
 
 def sort_by_region(items: list[BidItem], region_keywords: list[str]) -> list[BidItem]:
@@ -113,16 +114,13 @@ def main():
     unique_items = deduplicate_items(all_items)
     logger.info(f"去重后剩余 {len(unique_items)} 条")
 
-    # 3. 地区标记（不过滤，只标记）
-    marked_items = filter_by_region(unique_items, REGION_KEYWORDS)
+    # 3. 地区筛选（只保留云南/昆明）
+    filtered_items = filter_by_region(unique_items, REGION_KEYWORDS)
+    logger.info(f"地区筛选后剩余 {len(filtered_items)} 条")
 
-    # 4. 按地区排序（目标地区优先）
-    sorted_items = sort_by_region(marked_items, REGION_KEYWORDS)
-    logger.info(f"最终返回 {len(sorted_items)} 条结果")
-
-    # 5. 发送邮件
-    if sorted_items:
-        success = send_email(sorted_items)
+    # 4. 发送邮件
+    if filtered_items:
+        success = send_email(filtered_items)
         if success:
             logger.info("✅ 任务完成，邮件已发送")
         else:
