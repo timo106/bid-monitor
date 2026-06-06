@@ -80,13 +80,24 @@ class BaseScraper(ABC):
             补充了详细信息的 BidItem
         """
         if not item.url:
+            logger.debug(f"[{self.source_name}] 跳过详情获取: URL为空")
             return item
 
         try:
-            resp = self._request(item.url)
+            logger.info(f"[{self.source_name}] 正在获取详情: {item.url}")
+            # 添加更完整的请求头
+            headers = {
+                "Referer": self.base_url,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                "Cache-Control": "no-cache",
+            }
+            resp = self._request(item.url, headers=headers)
             if not resp:
+                logger.warning(f"[{self.source_name}] 详情页请求失败: {item.url}")
                 return item
 
+            logger.info(f"[{self.source_name}] 详情页获取成功, 长度: {len(resp.text)}")
             html = resp.text
             item = self._parse_detail(html, item)
         except Exception as e:

@@ -238,6 +238,10 @@ class CCGPScraper(BaseScraper):
                 title = link_tag.get_text(strip=True)
                 url = link_tag.get("href", "")
 
+                # 确保 URL 是完整地址
+                if url and not url.startswith("http"):
+                    url = f"http://www.ccgp.gov.cn{url}"
+
                 # 提取日期
                 date_span = li.select_one("span")
                 pub_date = date_span.get_text(strip=True) if date_span else ""
