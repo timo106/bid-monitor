@@ -195,7 +195,7 @@ def main(stop_event: Optional[threading.Event] = None):
         return result
 
     if filtered_items:
-        success = send_email(filtered_items, summary_items=keyword_items)
+        success = send_email(filtered_items)
         if success:
             result["email_sent"] = True
             logger.info("✅ 任务完成，邮件已发送")
