@@ -68,17 +68,28 @@ class AIExtractor:
         if self.enabled and self.api_key:
             self._init_client()
 
+    # 各提供商的 API 地址
+    PROVIDER_ENDPOINTS = {
+        "doubao": "https://ark.cn-beijing.volces.com/api/v3",   # 火山引擎
+        "deepseek": "https://api.deepseek.com",                  # DeepSeek
+        "openai": "https://api.openai.com/v1",                   # OpenAI
+    }
+
     def _init_client(self):
         """初始化 API 客户端"""
         try:
             if self.provider == "claude":
                 import anthropic
                 self._client = anthropic.Anthropic(api_key=self.api_key)
-            elif self.provider == "openai":
+            elif self.provider in ("openai", "doubao", "deepseek"):
                 import openai
-                self._client = openai.OpenAI(api_key=self.api_key)
+                base_url = self.PROVIDER_ENDPOINTS.get(self.provider)
+                self._client = openai.OpenAI(
+                    api_key=self.api_key,
+                    base_url=base_url,
+                )
             else:
-                logger.error(f"不支持的 AI 提供商: {self.provider}")
+                logger.error(f"不支持的 AI 提供商: {self.provider}，支持: claude/openai/doubao/deepseek")
                 self.enabled = False
         except ImportError as e:
             logger.error(f"AI 库未安装: {e}")
@@ -163,7 +174,7 @@ class AIExtractor:
         try:
             if self.provider == "claude":
                 return self._call_claude(prompt)
-            elif self.provider == "openai":
+            elif self.provider in ("openai", "doubao", "deepseek"):
                 return self._call_openai(prompt)
         except Exception as e:
             logger.error(f"[AI] API 调用失败: {e}")

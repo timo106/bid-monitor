@@ -120,9 +120,9 @@ try:
     from config_local import AI_CONFIG
 except ImportError:
     AI_CONFIG = {
-        "provider": "claude",           # claude 或 openai
+        "provider": "deepseek",         # deepseek / doubao / openai / claude
         "api_key": "",                  # API Key
-        "model": "claude-sonnet-4-20250514",  # 模型名称
+        "model": "deepseek-chat",       # 模型名称
         "enabled": False,               # 是否启用
         "max_calls_per_run": 20,        # 每次运行最多调用次数
     }
