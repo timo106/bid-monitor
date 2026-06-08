@@ -156,19 +156,46 @@ def main(stop_event: Optional[threading.Event] = None):
     keyword_items = filter_by_keywords(unique_items, KEYWORDS)
     logger.info(f"关键词筛选后剩余 {len(keyword_items)} 条")
 
-    # 4. 地区筛选（只保留云南/昆明）
+    # 4. 结构化信息提取（在地区筛选之前，让更多条目有机会提取）
+    from scrapers.base import BaseScraper
+    logger.info("开始提取结构化信息...")
+    enrich_count = 0
+    for item in keyword_items:
+        if item.bid_number or item.purchaser or item.amount:
+            enrich_count += 1
+            continue  # 已有结构化数据，跳过
+        if item.url and item.source == "中国政府采购网":
+            try:
+                # 对 ccgp 的条目补充提取结构化信息
+                from anti_crawl import create_session, smart_request, get_random_headers
+                from config import PROXY
+                sess = create_session(proxy=PROXY)
+                resp = smart_request(sess, item.url, headers=get_random_headers(referer="http://search.ccgp.gov.cn/"))
+                if resp:
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(resp.text, "lxml")
+                    content = soup.select_one("div.vF_detail_content") or soup
+                    html = str(content)
+                    # 用基类的解析方法提取
+                    BaseScraper._parse_detail(None, html, item)
+                    enrich_count += 1
+            except Exception as e:
+                logger.debug(f"提取结构化信息失败: {item.title[:30]}... {e}")
+    logger.info(f"结构化信息提取完成，已提取 {enrich_count} 条")
+
+    # 5. 地区筛选（只保留云南/昆明）
     filtered_items = filter_by_region(keyword_items, REGION_KEYWORDS)
     result["filtered"] = len(filtered_items)
     logger.info(f"地区筛选后剩余 {len(filtered_items)} 条")
 
-    # 4. 发送邮件
+    # 6. 发送邮件（摘要表=全部关键词匹配项，详细列表=地区筛选项）
     if stop_event and stop_event.is_set():
         result["stopped"] = True
         logger.info("程序已被用户停止")
         return result
 
     if filtered_items:
-        success = send_email(filtered_items)
+        success = send_email(filtered_items, summary_items=keyword_items)
         if success:
             result["email_sent"] = True
             logger.info("✅ 任务完成，邮件已发送")

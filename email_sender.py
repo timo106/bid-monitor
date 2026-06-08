@@ -25,10 +25,19 @@ def _escape(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
-def build_email_content(items: list[BidItem], date_str: str) -> str:
-    """生成 HTML 格式的邮件内容，顶部包含结构化摘要表格"""
+def build_email_content(items: list[BidItem], date_str: str, summary_items: list[BidItem] = None) -> str:
+    """
+    生成 HTML 格式的邮件内容
 
-    # 按来源分组
+    Args:
+        items: 地区筛选后的条目（用于详细列表）
+        date_str: 日期字符串
+        summary_items: 全部关键词匹配的条目（用于结构化摘要表），默认同 items
+    """
+    if summary_items is None:
+        summary_items = items
+
+    # 按来源分组（详细列表用）
     by_source = {}
     for item in items:
         source = item.source
@@ -74,7 +83,7 @@ def build_email_content(items: list[BidItem], date_str: str) -> str:
 <p style="color:#666;">日期：{date_str}</p>
 <div class="summary">
     <strong>📊 今日汇总：</strong>
-    共 <strong>{len(items)}</strong> 条招标信息，
+    共 <strong>{len(summary_items)}</strong> 条招标信息（{len(items)} 条昆明/云南地区），
     来自 <strong>{len(by_source)}</strong> 个数据源
 </div>
 """
@@ -102,7 +111,7 @@ def build_email_content(items: list[BidItem], date_str: str) -> str:
     <th style="width:6%;">来源</th>
 </tr></thead><tbody>
 """
-        for idx, item in enumerate(items, 1):
+        for idx, item in enumerate(summary_items, 1):
             name = _escape(item.project_name or item.title[:40])
             number = _escape(item.bid_number) or "-"
             purchaser = _escape(item.purchaser) or "-"
@@ -171,12 +180,13 @@ def build_email_content(items: list[BidItem], date_str: str) -> str:
     return html
 
 
-def send_email(items: list[BidItem]) -> bool:
+def send_email(items: list[BidItem], summary_items: list[BidItem] = None) -> bool:
     """
     发送邮件
 
     Args:
-        items: 招标信息列表
+        items: 地区筛选后的条目（详细列表）
+        summary_items: 全部关键词匹配的条目（摘要表），默认同 items
 
     Returns:
         是否发送成功
@@ -200,7 +210,7 @@ def send_email(items: list[BidItem]) -> bool:
     msg["To"] = receiver
 
     # HTML 内容
-    html_content = build_email_content(items, date_str)
+    html_content = build_email_content(items, date_str, summary_items=summary_items)
     msg.attach(MIMEText(html_content, "html", "utf-8"))
 
     # 纯文本备用
