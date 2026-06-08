@@ -219,6 +219,9 @@ def smart_request(
         try:
             resp = session.request(method, url, **kwargs)
             resp.raise_for_status()
+            # 自动修正编码（很多政府网站不声明 charset，导致中文乱码）
+            if resp.encoding and resp.encoding.lower() in ('iso-8859-1', 'latin-1', 'ascii'):
+                resp.encoding = resp.apparent_encoding or 'utf-8'
             return resp
 
         except requests.exceptions.HTTPError as e:

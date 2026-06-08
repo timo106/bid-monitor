@@ -228,6 +228,7 @@ class BaseScraper(ABC):
 
         # 招标人/采购人
         purchaser_patterns = [
+            r"采购人信息.*?名\s*称[：:]\s*([^\n]+)",
             r"招\s*标\s*人[：:]\s*([^\n]+)",
             r"采\s*购\s*人[：:]\s*([^\n]+)",
             r"招标单位[：:]\s*([^\n]+)",
@@ -235,7 +236,7 @@ class BaseScraper(ABC):
             r"业主单位[：:]\s*([^\n]+)",
         ]
         for pattern in purchaser_patterns:
-            match = re.search(pattern, text)
+            match = re.search(pattern, text, re.DOTALL)
             if match:
                 item.purchaser = match.group(1).strip()[:100]
                 break
@@ -246,10 +247,12 @@ class BaseScraper(ABC):
             r"资格要求[：:]\s*([^\n](?:[^\n]*[^\n])?)",
             r"投标人资格[：:]\s*([^\n](?:[^\n]*[^\n])?)",
             r"供应商资格[：:]\s*([^\n](?:[^\n]*[^\n])?)",
+            r"申请人的资格要求[：:]*\s*([^\n](?:[^\n]*[^\n])?)",
+            r"特定资格要求[：:]\s*([^\n]+)",
             r"具备[：]?\s*(.*?资质[^\n]*)",
         ]
         for pattern in qualification_patterns:
-            match = re.search(pattern, text)
+            match = re.search(pattern, text, re.DOTALL)
             if match:
                 item.qualification = match.group(1).strip()[:200]
                 break
@@ -260,13 +263,37 @@ class BaseScraper(ABC):
             r"开标地址[：:]\s*([^\n]+)",
             r"投标地点[：:]\s*([^\n]+)",
             r"递交地点[：:]\s*([^\n]+)",
-            r"采购地点[：:]\s*([^\n]+)",
+            r"提交投标文件.*?地\s*点[：:]\s*([^\n]+)",
         ]
         for pattern in open_location_patterns:
-            match = re.search(pattern, text)
+            match = re.search(pattern, text, re.DOTALL)
             if match:
                 item.open_location = match.group(1).strip()[:150]
                 break
+
+        # 补充：投标截止时间（无冒号格式）
+        if not item.bid_end_time:
+            end_patterns_v2 = [
+                r"提交投标文件截止时间.*?(\d{4}年\d{1,2}月\d{1,2}日[^\n]*)",
+                r"投标截止.*?(\d{4}年\d{1,2}月\d{1,2}日[^\n]*)",
+                r"截止时间.*?(\d{4}年\d{1,2}月\d{1,2}日[^\n]*)",
+            ]
+            for pattern in end_patterns_v2:
+                match = re.search(pattern, text, re.DOTALL)
+                if match:
+                    item.bid_end_time = match.group(1).strip()[:100]
+                    break
+
+        # 补充：开标时间（无冒号格式）
+        if not item.bid_start_time:
+            start_patterns_v2 = [
+                r"开标时间.*?(\d{4}年\d{1,2}月\d{1,2}日[^\n]*)",
+            ]
+            for pattern in start_patterns_v2:
+                match = re.search(pattern, text, re.DOTALL)
+                if match:
+                    item.bid_start_time = match.group(1).strip()[:100]
+                    break
 
         return item
 
