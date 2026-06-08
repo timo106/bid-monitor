@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 class CCGPScraper(BaseScraper):
     """中国政府采购网爬虫"""
 
-    def __init__(self):
-        super().__init__("中国政府采购网", "http://search.ccgp.gov.cn")
+    def __init__(self, stop_event=None):
+        super().__init__("中国政府采购网", "http://search.ccgp.gov.cn", stop_event=stop_event)
 
     def _parse_detail(self, html: str, item: BidItem) -> BidItem:
         """解析中国政府采购网详情页"""

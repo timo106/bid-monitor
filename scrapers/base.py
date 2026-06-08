@@ -5,6 +5,7 @@
 
 import time
 import logging
+import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional
@@ -40,9 +41,10 @@ class BidItem:
 class BaseScraper(ABC):
     """爬虫基类"""
 
-    def __init__(self, source_name: str, base_url: str):
+    def __init__(self, source_name: str, base_url: str, stop_event: Optional[threading.Event] = None):
         self.source_name = source_name
         self.base_url = base_url
+        self.stop_event = stop_event
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": USER_AGENT,
@@ -64,9 +66,17 @@ class BaseScraper(ABC):
                     time.sleep(REQUEST_DELAY * (attempt + 1))
         return None
 
+    @property
+    def is_stopped(self) -> bool:
+        """检查是否已请求停止"""
+        return self.stop_event is not None and self.stop_event.is_set()
+
     def _sleep(self):
-        """请求间隔"""
-        time.sleep(REQUEST_DELAY)
+        """请求间隔，支持中断"""
+        if self.stop_event:
+            self.stop_event.wait(REQUEST_DELAY)
+        else:
+            time.sleep(REQUEST_DELAY)
 
     def fetch_detail(self, item: BidItem) -> BidItem:
         """
@@ -185,6 +195,10 @@ class BaseScraper(ABC):
         """
         enriched = []
         for i, item in enumerate(items):
+            if self.is_stopped:
+                logger.info(f"[{self.source_name}] 用户停止，跳过剩余详情获取")
+                enriched.extend(items[i:])
+                break
             if i < max_detail:
                 logger.info(f"[{self.source_name}] 获取详情 ({i+1}/{min(len(items), max_detail)}): {item.title[:30]}...")
                 item = self.fetch_detail(item)

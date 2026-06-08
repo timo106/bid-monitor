@@ -32,3 +32,8 @@ run.log
 
 # 任务配置临时文件
 task.xml
+
+# PyInstaller 构建产物
+dist/
+build/
+*.spec

@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 class KunmingTZBScraper(BaseScraper):
     """昆明市公共资源交易中心爬虫（使用Playwright）"""
 
-    def __init__(self):
-        super().__init__("昆明市公共资源交易中心", "http://kmszbzx.gdtzb.com/v1/")
+    def __init__(self, stop_event=None):
+        super().__init__("昆明市公共资源交易中心", "http://kmszbzx.gdtzb.com/v1/", stop_event=stop_event)
 
     def scrape(self, keywords: list[str], region_keywords: list[str]) -> list[BidItem]:
         """使用 Playwright 抓取"""
@@ -57,6 +57,9 @@ class KunmingTZBScraper(BaseScraper):
 
             # 使用搜索功能搜索每个关键词，筛选云南地区(area_id=25)
             for keyword in keywords:
+                if self.is_stopped:
+                    logger.info("[昆明市公共资源交易中心] 用户停止，中断抓取")
+                    break
                 logger.info(f"[昆明市公共资源交易中心] 搜索关键词: {keyword}")
                 # areaid=25 是云南，type=10 是工程招标
                 search_url = f"http://www.gdtzb.com/zb/search.php?kw={quote(keyword)}&areaid=25&type=10"

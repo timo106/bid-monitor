@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 class KunmingGGZYScraper(BaseScraper):
     """昆明市公共资源交易网爬虫"""
 
-    def __init__(self):
-        super().__init__("昆明市公共资源交易网", "http://ggzy.km.gov.cn")
+    def __init__(self, stop_event=None):
+        super().__init__("昆明市公共资源交易网", "http://ggzy.km.gov.cn", stop_event=stop_event)
 
     def scrape(self, keywords: list[str], region_keywords: list[str]) -> list[BidItem]:
         results = []

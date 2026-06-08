@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 class YunnanGGZYScraper(BaseScraper):
     """云南省公共资源交易中心爬虫"""
 
-    def __init__(self):
-        super().__init__("云南省公共资源交易中心", "https://ggzy.yn.gov.cn")
+    def __init__(self, stop_event=None):
+        super().__init__("云南省公共资源交易中心", "https://ggzy.yn.gov.cn", stop_event=stop_event)
         self.session.headers.update({
             "Referer": "https://ggzy.yn.gov.cn/",
         })

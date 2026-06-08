@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 class CEBPubScraper(BaseScraper):
     """中国招标投标公共服务平台爬虫"""
 
-    def __init__(self):
-        super().__init__("中国招标投标公共服务平台", "http://www.cebpubservice.com")
+    def __init__(self, stop_event=None):
+        super().__init__("中国招标投标公共服务平台", "http://www.cebpubservice.com", stop_event=stop_event)
 
     def scrape(self, keywords: list[str], region_keywords: list[str]) -> list[BidItem]:
         results = []
