@@ -28,14 +28,18 @@ EXTRACT_PROMPT = """你是一个专业的招标信息分析师。请从以下招
 5. 返回严格的 JSON 格式，不要添加任何其他文字
 
 提取字段：
+- bid_number: 招标编号/采购编号
+- project_name: 项目名称
+- purchaser: 招标人/采购人/招标单位
 - amount: 项目预算/金额
 - bid_bond: 投标保证金
 - bid_end_time: 投标截止时间
 - bid_start_time: 开标时间/投标开始时间
+- open_location: 开标地点/递交地点
+- qualification: 资质要求/资格要求（简要概括，不超过100字）
 - contact: 联系人姓名
 - phone: 联系电话
 - category: 公告类型（招标公告/中标公告/竞争性谈判/询价公告/其他）
-- project_type: 项目类型（工程/货物/服务）
 
 招标公告文本：
 {text}
@@ -271,18 +275,25 @@ class AIExtractor:
             return
 
         # 只填充空字段（不覆盖已有的正则提取结果）
-        if not item.amount and result.get("amount"):
-            item.amount = result["amount"]
-        if not item.bid_bond and result.get("bid_bond"):
-            item.bid_bond = result["bid_bond"]
-        if not item.bid_end_time and result.get("bid_end_time"):
-            item.bid_end_time = result["bid_end_time"]
-        if not item.bid_start_time and result.get("bid_start_time"):
-            item.bid_start_time = result["bid_start_time"]
+        field_map = [
+            ("amount", "amount"),
+            ("bid_bond", "bid_bond"),
+            ("bid_end_time", "bid_end_time"),
+            ("bid_start_time", "bid_start_time"),
+            ("category", "category"),
+            ("bid_number", "bid_number"),
+            ("project_name", "project_name"),
+            ("purchaser", "purchaser"),
+            ("qualification", "qualification"),
+            ("open_location", "open_location"),
+        ]
+        for item_field, result_field in field_map:
+            if not getattr(item, item_field, "") and result.get(result_field):
+                setattr(item, item_field, result[result_field])
+
+        # 联系人特殊处理（合并姓名和电话）
         if not item.contact and result.get("contact"):
             contact = result["contact"]
             if result.get("phone"):
                 contact = f"{contact} / {result['phone']}"
             item.contact = contact
-        if not item.category and result.get("category"):
-            item.category = result["category"]

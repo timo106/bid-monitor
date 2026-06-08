@@ -32,12 +32,19 @@ class BidItem:
     source: str                         # 来源网站
     publish_date: str = ""              # 发布日期
     region: str = ""                    # 地区
-    amount: str = ""                    # 项目金额
+    amount: str = ""                    # 项目金额/预算
     category: str = ""                  # 类型（招标公告/中标公告等）
     bid_bond: str = ""                  # 投标保证金
-    bid_start_time: str = ""            # 投标开始时间
+    bid_start_time: str = ""            # 投标开始时间/开标时间
     bid_end_time: str = ""              # 投标截止时间
     contact: str = ""                   # 联系方式
+
+    # 新增结构化字段
+    bid_number: str = ""                # 招标编号
+    project_name: str = ""              # 项目名称
+    purchaser: str = ""                 # 招标人/采购人
+    qualification: str = ""             # 资质要求
+    open_location: str = ""             # 开标地点
 
     @property
     def unique_key(self) -> str:
@@ -183,11 +190,82 @@ class BaseScraper(ABC):
             r"联系人[：:]\s*([^\n]+)",
             r"联系方式[：:]\s*([^\n]+)",
             r"联系电话[：:]\s*([^\n]+)",
+            r"项目联系人[：:]\s*([^\n]+)",
         ]
         for pattern in contact_patterns:
             match = re.search(pattern, text)
             if match:
                 item.contact = match.group(1).strip()[:100]
+                break
+
+        # ---------- 新增结构化字段 ----------
+
+        # 招标编号
+        bid_number_patterns = [
+            r"招标编号[：:]\s*([A-Za-z0-9\-_/]+)",
+            r"采购编号[：:]\s*([A-Za-z0-9\-_/]+)",
+            r"项目编号[：:]\s*([A-Za-z0-9\-_/]+)",
+            r"编\s*号[：:]\s*([A-Za-z0-9\-_/]+)",
+            r"招标编[号碼][：:]\s*([^\n]+)",
+        ]
+        for pattern in bid_number_patterns:
+            match = re.search(pattern, text)
+            if match:
+                item.bid_number = match.group(1).strip()[:80]
+                break
+
+        # 项目名称
+        project_name_patterns = [
+            r"项目名称[：:]\s*([^\n]+)",
+            r"采购项目[：:]\s*([^\n]+)",
+            r"招标项目[：:]\s*([^\n]+)",
+        ]
+        for pattern in project_name_patterns:
+            match = re.search(pattern, text)
+            if match:
+                item.project_name = match.group(1).strip()[:120]
+                break
+
+        # 招标人/采购人
+        purchaser_patterns = [
+            r"招\s*标\s*人[：:]\s*([^\n]+)",
+            r"采\s*购\s*人[：:]\s*([^\n]+)",
+            r"招标单位[：:]\s*([^\n]+)",
+            r"采购单位[：:]\s*([^\n]+)",
+            r"业主单位[：:]\s*([^\n]+)",
+        ]
+        for pattern in purchaser_patterns:
+            match = re.search(pattern, text)
+            if match:
+                item.purchaser = match.group(1).strip()[:100]
+                break
+
+        # 资质要求
+        qualification_patterns = [
+            r"资质要求[：:]\s*([^\n](?:[^\n]*[^\n])?)",
+            r"资格要求[：:]\s*([^\n](?:[^\n]*[^\n])?)",
+            r"投标人资格[：:]\s*([^\n](?:[^\n]*[^\n])?)",
+            r"供应商资格[：:]\s*([^\n](?:[^\n]*[^\n])?)",
+            r"具备[：]?\s*(.*?资质[^\n]*)",
+        ]
+        for pattern in qualification_patterns:
+            match = re.search(pattern, text)
+            if match:
+                item.qualification = match.group(1).strip()[:200]
+                break
+
+        # 开标地点
+        open_location_patterns = [
+            r"开标地点[：:]\s*([^\n]+)",
+            r"开标地址[：:]\s*([^\n]+)",
+            r"投标地点[：:]\s*([^\n]+)",
+            r"递交地点[：:]\s*([^\n]+)",
+            r"采购地点[：:]\s*([^\n]+)",
+        ]
+        for pattern in open_location_patterns:
+            match = re.search(pattern, text)
+            if match:
+                item.open_location = match.group(1).strip()[:150]
                 break
 
         return item
