@@ -8,6 +8,8 @@ import smtplib
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.header import Header
+from email.utils import formataddr
 from datetime import datetime
 
 from config import EMAIL_CONFIG
@@ -192,6 +194,7 @@ def send_email(items: list[BidItem]) -> bool:
         是否发送成功
     """
     sender = EMAIL_CONFIG["sender"]
+    sender_name = EMAIL_CONFIG.get("sender_name", "招标信息监控")
     password = EMAIL_CONFIG["password"]
     receiver = EMAIL_CONFIG["receiver"]
 
@@ -204,8 +207,8 @@ def send_email(items: list[BidItem]) -> bool:
 
     # 构建邮件
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = sender
+    msg["Subject"] = Header(subject, "utf-8").encode()
+    msg["From"] = formataddr((str(Header(sender_name, "utf-8")), sender))
     msg["To"] = receiver
 
     # HTML 内容
