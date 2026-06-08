@@ -12,7 +12,14 @@ from typing import Optional
 
 import requests
 
-from config import USER_AGENT, REQUEST_TIMEOUT, REQUEST_DELAY
+from config import USER_AGENT, REQUEST_TIMEOUT, REQUEST_DELAY, PROXY, AI_CONFIG
+from anti_crawl import (
+    create_session,
+    smart_request,
+    random_delay,
+    get_random_headers,
+)
+from ai_extractor import AIExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -45,26 +52,20 @@ class BaseScraper(ABC):
         self.source_name = source_name
         self.base_url = base_url
         self.stop_event = stop_event
-        self.session = requests.Session()
-        self.session.headers.update({
-            "User-Agent": USER_AGENT,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-        })
+        # 使用反爬模块创建 Session（带代理、随机 UA）
+        self.session = create_session(proxy=PROXY)
+        # AI 提取器
+        self.ai_extractor = AIExtractor(AI_CONFIG)
 
     def _request(self, url: str, method: str = "GET", **kwargs) -> Optional[requests.Response]:
-        """发送请求，带重试和错误处理"""
-        kwargs.setdefault("timeout", REQUEST_TIMEOUT)
-        for attempt in range(3):
-            try:
-                resp = self.session.request(method, url, **kwargs)
-                resp.raise_for_status()
-                return resp
-            except requests.RequestException as e:
-                logger.warning(f"[{self.source_name}] 请求失败 (第{attempt+1}次): {e}")
-                if attempt < 2:
-                    time.sleep(REQUEST_DELAY * (attempt + 1))
-        return None
+        """发送请求，使用智能反爬策略"""
+        return smart_request(
+            self.session, url, method,
+            max_retries=3,
+            base_timeout=REQUEST_TIMEOUT,
+            stop_event=self.stop_event,
+            **kwargs,
+        )
 
     @property
     def is_stopped(self) -> bool:
@@ -72,16 +73,13 @@ class BaseScraper(ABC):
         return self.stop_event is not None and self.stop_event.is_set()
 
     def _sleep(self):
-        """请求间隔，支持中断"""
-        if self.stop_event:
-            self.stop_event.wait(REQUEST_DELAY)
-        else:
-            time.sleep(REQUEST_DELAY)
+        """随机延迟，模拟人类行为"""
+        random_delay(base=REQUEST_DELAY, jitter=2.0, stop_event=self.stop_event)
 
     def fetch_detail(self, item: BidItem) -> BidItem:
         """
         获取详情页信息（投标保证金、时间等）
-        子类可以重写此方法以适配不同网站
+        先用正则提取，如果关键字段缺失则用 AI 补充
 
         Args:
             item: 基本信息的 BidItem
@@ -95,13 +93,8 @@ class BaseScraper(ABC):
 
         try:
             logger.info(f"[{self.source_name}] 正在获取详情: {item.url}")
-            # 添加更完整的请求头
-            headers = {
-                "Referer": self.base_url,
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-                "Cache-Control": "no-cache",
-            }
+            # 使用随机化的请求头
+            headers = get_random_headers(referer=self.base_url)
             resp = self._request(item.url, headers=headers)
             if not resp:
                 logger.warning(f"[{self.source_name}] 详情页请求失败: {item.url}")
@@ -109,7 +102,24 @@ class BaseScraper(ABC):
 
             logger.info(f"[{self.source_name}] 详情页获取成功, 长度: {len(resp.text)}")
             html = resp.text
+
+            # 1. 先用正则提取
             item = self._parse_detail(html, item)
+
+            # 2. 如果关键字段缺失，用 AI 补充
+            if self.ai_extractor.is_available:
+                missing = []
+                if not item.bid_end_time:
+                    missing.append("截止时间")
+                if not item.amount:
+                    missing.append("金额")
+                if not item.contact:
+                    missing.append("联系人")
+
+                if missing:
+                    logger.info(f"[{self.source_name}] 正则未提取到 {', '.join(missing)}，尝试 AI 提取")
+                    self.ai_extractor.apply_to_item(item, html)
+
         except Exception as e:
             logger.warning(f"[{self.source_name}] 获取详情失败: {e}")
 

@@ -14,6 +14,29 @@ KEYWORDS = [
     "输变电",
 ]
 
+# 同义词扩展（匹配时自动展开）
+KEYWORD_SYNONYMS = {
+    "电力": ["供配电", "电力工程", "电力系统", "电力设施", "电力设备", "电力改造", "电力线路"],
+    "电网": ["输电网", "配电网", "电网建设", "电网改造", "电网工程"],
+    "供电": ["配电", "供电服务", "供电工程", "供电系统"],
+    "变电站": ["变电所", "开关站", "变电工程", "变电站建设"],
+    "输变电": ["输变电工程", "输变电线路", "输电", "送电", "输电线路"],
+}
+
+# 排除词（标题包含这些词且不包含精确关键词时排除）
+EXCLUDE_WORDS = [
+    "电子商务", "电子商城",
+    "电影", "电影院",
+    "电脑", "电脑配件",
+    "电话", "电话机",
+    "电梯", "电梯维保",
+    "电焊", "电焊机",
+    "电池", "蓄电池", "锂电池",
+    "电动汽车", "电动车",
+    "电视", "电视机",
+    "电磁", "电磁阀",
+]
+
 # ============================================================
 # 地区筛选
 # ============================================================
@@ -56,13 +79,17 @@ SOURCES = {
 # ============================================================
 import os
 
-EMAIL_CONFIG = {
-    "smtp_server": "smtp.qq.com",
-    "smtp_port": 465,  # SSL
-    "sender": os.environ.get("EMAIL_USER", ""),       # 发件人邮箱
-    "password": os.environ.get("EMAIL_PASS", ""),      # QQ邮箱授权码
-    "receiver": os.environ.get("EMAIL_TO", ""),        # 收件人邮箱
-}
+# 尝试导入本地配置
+try:
+    from config_local import EMAIL_CONFIG
+except ImportError:
+    EMAIL_CONFIG = {
+        "smtp_server": "smtp.qq.com",
+        "smtp_port": 465,  # SSL
+        "sender": os.environ.get("EMAIL_USER", ""),       # 发件人邮箱
+        "password": os.environ.get("EMAIL_PASS", ""),      # QQ邮箱授权码
+        "receiver": os.environ.get("EMAIL_TO", ""),        # 收件人邮箱
+    }
 
 # ============================================================
 # 爬虫配置
@@ -71,11 +98,31 @@ REQUEST_TIMEOUT = 15       # 请求超时时间（秒）
 REQUEST_DELAY = 1.5        # 请求间隔（秒）
 MAX_RESULTS_PER_SOURCE = 50  # 每个数据源最多获取条数
 
-# ============================================================
-# User-Agent
-# ============================================================
+# User-Agent（由 anti_crawl 模块轮换，这里保留作为默认值）
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/120.0.0.0 Safari/537.36"
 )
+
+# ============================================================
+# 代理配置（从本地配置读取）
+# ============================================================
+try:
+    from config_local import PROXY
+except ImportError:
+    PROXY = None  # 不使用代理，如 "http://127.0.0.1:7897"
+
+# ============================================================
+# AI 提取配置（从本地配置读取）
+# ============================================================
+try:
+    from config_local import AI_CONFIG
+except ImportError:
+    AI_CONFIG = {
+        "provider": "claude",           # claude 或 openai
+        "api_key": "",                  # API Key
+        "model": "claude-sonnet-4-20250514",  # 模型名称
+        "enabled": False,               # 是否启用
+        "max_calls_per_run": 20,        # 每次运行最多调用次数
+    }

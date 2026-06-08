@@ -10,7 +10,7 @@ import threading
 from datetime import datetime
 from typing import Optional
 
-from config import KEYWORDS, REGION_KEYWORDS, SOURCES
+from config import KEYWORDS, REGION_KEYWORDS, SOURCES, KEYWORD_SYNONYMS, EXCLUDE_WORDS
 from scrapers import (
     CCGPScraper,
     YunnanGGZYScraper,
@@ -19,6 +19,7 @@ from scrapers import (
     CEBPubScraper,
 )
 from scrapers.base import BidItem
+from keyword_filter import keyword_match
 from email_sender import send_email
 
 # 配置日志
@@ -93,6 +94,21 @@ def filter_by_region(items: list[BidItem], region_keywords: list[str]) -> list[B
     return filtered
 
 
+def filter_by_keywords(items: list[BidItem], keywords: list[str]) -> list[BidItem]:
+    """使用智能关键词筛选（同义词扩展 + 排除词过滤）"""
+    filtered = []
+    for item in items:
+        match, matched_kw = keyword_match(
+            item.title, keywords,
+            synonyms=KEYWORD_SYNONYMS,
+            exclude_words=EXCLUDE_WORDS,
+        )
+        if match:
+            filtered.append(item)
+    logger.info(f"[关键词筛选] {len(items)} 条 → {len(filtered)} 条匹配")
+    return filtered
+
+
 def sort_by_region(items: list[BidItem], region_keywords: list[str]) -> list[BidItem]:
     """按地区排序，目标地区的排在前面"""
     def sort_key(item):
@@ -136,8 +152,12 @@ def main(stop_event: Optional[threading.Event] = None):
     unique_items = deduplicate_items(all_items)
     logger.info(f"去重后剩余 {len(unique_items)} 条")
 
-    # 3. 地区筛选（只保留云南/昆明）
-    filtered_items = filter_by_region(unique_items, REGION_KEYWORDS)
+    # 3. 智能关键词筛选（同义词扩展 + 排除词过滤）
+    keyword_items = filter_by_keywords(unique_items, KEYWORDS)
+    logger.info(f"关键词筛选后剩余 {len(keyword_items)} 条")
+
+    # 4. 地区筛选（只保留云南/昆明）
+    filtered_items = filter_by_region(keyword_items, REGION_KEYWORDS)
     result["filtered"] = len(filtered_items)
     logger.info(f"地区筛选后剩余 {len(filtered_items)} 条")
 
